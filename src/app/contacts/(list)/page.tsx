@@ -7,6 +7,7 @@ import ContactsTable from "@/components/contacts/ContactsTable";
 import ContactsToolbar from "@/components/contacts/ContactsToolbar";
 import EmptyState from "@/components/contacts/EmptyState";
 import Pagination from "@/components/contacts/Pagination";
+import SuperheroMode from "@/components/contacts/SuperheroMode";
 import { buttonClasses } from "@/components/ui/Button";
 import { ApiUnreachableError, apiBaseUrl } from "@/lib/apiClient";
 import { getHealth, listContacts } from "@/lib/contacts/api";
@@ -56,10 +57,13 @@ export default async function ContactsPage({
           </p>
         </div>
 
-        <Link href="/contacts/new" className={buttonClasses("primary")}>
-          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          New contact
-        </Link>
+        <div className="flex items-center gap-2">
+          <SuperheroMode contacts={result?.items ?? []} />
+          <Link href="/contacts/new" className={buttonClasses("primary")}>
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            New contact
+          </Link>
+        </div>
       </header>
 
       {error ? (
