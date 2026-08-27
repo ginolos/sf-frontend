@@ -1,9 +1,12 @@
 import { z } from "zod";
 import type {
+  AddressFormValue,
+  AddressInput,
   ContactFormValues,
   ContactInput,
   ContactTextField,
 } from "./types";
+import { ADDRESS_TYPES } from "./types";
 
 /**
  * Client/server-shared validation for the contact form.
@@ -106,6 +109,27 @@ export const photoDataUrlSchema = z
   .nullable()
   .default(null);
 
+export const addressInputSchema = z
+  .object({
+    type: z.enum(ADDRESS_TYPES),
+    street_address: optionalText(300, "Street address"),
+    city: optionalText(120, "City"),
+    state: optionalText(120, "State / region"),
+    postal_code: optionalText(20, "Postal code"),
+    country: optionalText(120, "Country"),
+  })
+  .refine(
+    (address) =>
+      Boolean(
+        address.street_address ||
+          address.city ||
+          address.state ||
+          address.postal_code ||
+          address.country,
+      ),
+    { message: "Enter at least one location field" },
+  ) satisfies z.ZodType<AddressInput, unknown>;
+
 export const contactInputSchema = z.object({
   first_name: requiredText(100, "First name"),
   last_name: requiredText(100, "Last name"),
@@ -120,11 +144,7 @@ export const contactInputSchema = z.object({
   company: optionalText(200, "Company"),
   job_title: optionalText(200, "Job title"),
   photo: photoDataUrlSchema,
-  address: optionalText(300, "Address"),
-  city: optionalText(120, "City"),
-  state: optionalText(120, "State"),
-  postal_code: optionalText(20, "Postal code"),
-  country: optionalText(120, "Country"),
+  addresses: z.array(addressInputSchema).max(20, "A contact can have up to 20 addresses"),
   notes: z
     .string()
     .trim()
@@ -230,48 +250,6 @@ export const CONTACT_FIELD_GROUPS: ContactFieldGroup[] = [
     ],
   },
   {
-    title: "Address",
-    description: "Optional postal details.",
-    fields: [
-      {
-        name: "address",
-        label: "Street address",
-        maxLength: 300,
-        placeholder: "1 Market St, Suite 400",
-        autoComplete: "street-address",
-        wide: true,
-      },
-      {
-        name: "city",
-        label: "City",
-        maxLength: 120,
-        placeholder: "San Francisco",
-        autoComplete: "address-level2",
-      },
-      {
-        name: "state",
-        label: "State / region",
-        maxLength: 120,
-        placeholder: "CA",
-        autoComplete: "address-level1",
-      },
-      {
-        name: "postal_code",
-        label: "Postal code",
-        maxLength: 20,
-        placeholder: "94105",
-        autoComplete: "postal-code",
-      },
-      {
-        name: "country",
-        label: "Country",
-        maxLength: 120,
-        placeholder: "USA",
-        autoComplete: "country-name",
-      },
-    ],
-  },
-  {
     title: "Notes",
     description: "Anything worth remembering. No length limit.",
     fields: [
@@ -301,5 +279,25 @@ export function formDataToValues(formData: FormData): ContactFormValues {
   ) as Record<ContactTextField, string>;
 
   const photo = String(formData.get("photo") ?? "") || null;
-  return { ...textValues, photo };
+  let addresses: AddressFormValue[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("addresses") ?? "[]"));
+    if (!Array.isArray(parsed)) throw new TypeError("addresses must be an array");
+    addresses = parsed as AddressFormValue[];
+  } catch {
+    // Preserve an invalid entry so schema validation rejects forged form data
+    // instead of interpreting it as a request to clear every address.
+    addresses = [
+      {
+        type: "Other",
+        street_address: "",
+        city: "",
+        state: "",
+        postal_code: "",
+        country: "",
+      },
+    ];
+  }
+
+  return { ...textValues, photo, addresses };
 }

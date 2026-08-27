@@ -56,7 +56,9 @@ the app or its end-to-end tests.
 The list response must include the contact records and the total count used for
 pagination. Contact email addresses must be unique; the frontend presents a
 conflict response as an inline email-field error. Contact records may include a
-`photo` data URL; the create and replacement endpoints must return it unchanged.
+`photo` data URL and an `addresses` collection; the create and replacement
+endpoints must return both unchanged. Each address has its own `id`, a `Home`,
+`Work`, or `Other` type, and postal fields.
 
 ## Development workflow
 
@@ -133,8 +135,8 @@ Click a row to get here. It confirms the detail read path works end to end:
   `Job title at Company`, with **Edit**
   (`/contacts/[id]/edit`) and a destructive **Delete** that asks before it acts.
 - **Field table** — email and phone rendered as `mailto:` / `tel:` links, then
-  company, job title, address, and notes. Empty optional fields show `—` rather
-  than collapsing, so the shape of the record stays readable.
+  company, job title, typed addresses, and notes. Empty optional fields show `—`
+  rather than collapsing, so the shape of the record stays readable.
 - **Metadata table** — `ID`, `Created`, and `Last updated` in UTC, monospaced.
 
 Hand-editing the URL to an ID that does not exist gives you the styled 404 page
@@ -208,6 +210,9 @@ e2e/                      Playwright specs (run against the real API)
 - **Photos** — the picker validates JPEG, PNG, WebP, and GIF files up to 2 MB,
   then stores the data URL in a hidden form field. Edit forms carry the current
   photo through their full `PUT`; replacing or removing it is explicit.
+- **Addresses** — the dynamic editor serializes the complete typed address
+  collection into the form action. Add/remove operations are explicit, and edit
+  forms carry every retained address through the full `PUT` replacement.
 - **Styling** — Tailwind against semantic CSS variables (`bg-background`,
   `text-muted-foreground`, `border-hairline`, …) defined in `src/app/globals.css`.
   Dark is the default; light lives under `[data-theme="light"]`. Add colours as

@@ -77,6 +77,37 @@ test.describe('Contacts', () => {
     await expect(page.getByRole('heading', { name: 'No matching contacts' })).toBeVisible()
   })
 
+  test('creates and replaces multiple typed addresses', async ({ page }) => {
+    const email = uniqueEmail('addresses')
+    const last = `Address${Date.now().toString().slice(-6)}`
+
+    await page.goto('/contacts/new')
+    await page.getByLabel('First name').fill('Multi')
+    await page.getByLabel('Last name').fill(last)
+    await page.getByLabel('Email', { exact: false }).first().fill(email)
+
+    await page.getByRole('button', { name: 'Add address' }).click()
+    await page.getByLabel('Address 1 type').selectOption('Home')
+    await page.getByLabel('Street address').fill('12 Home Lane')
+    await page.getByRole('button', { name: 'Add address' }).click()
+    await page.getByLabel('Address 2 type').selectOption('Work')
+    await page.getByLabel('City').nth(1).fill('San Francisco')
+    await page.getByRole('button', { name: 'Create contact' }).click()
+
+    await expect(page.getByText('Home', { exact: true })).toBeVisible()
+    await expect(page.getByText('12 Home Lane')).toBeVisible()
+    await expect(page.getByText('Work', { exact: true })).toBeVisible()
+    await expect(page.getByText('San Francisco')).toBeVisible()
+
+    await page.getByRole('link', { name: 'Edit', exact: true }).click()
+    await page.getByRole('button', { name: 'Remove address 1' }).click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
+
+    await expect(page.getByText('Home', { exact: true })).not.toBeVisible()
+    await expect(page.getByText('Work', { exact: true })).toBeVisible()
+    await deleteFromDetailPage(page, `Multi ${last}`)
+  })
+
   test('rejects a duplicate email with a field-level error', async ({ page }) => {
     const email = uniqueEmail('dupe')
     const last = `Dupe${Date.now().toString().slice(-6)}`

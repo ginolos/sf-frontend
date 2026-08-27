@@ -37,8 +37,8 @@ describe("ContactForm", () => {
 
     expect(screen.getByLabelText(/first name/i)).toHaveValue("Ada");
     expect(screen.getByLabelText(/^email/i)).toHaveValue("ada@example.com");
-    // Nulls become empty inputs rather than the string "null".
-    expect(screen.getByLabelText(/street address/i)).toHaveValue("");
+    expect(screen.getByLabelText(/street address/i)).toHaveValue("1 Market St");
+    expect(screen.getByLabelText(/address 1 type/i)).toHaveValue("Work");
   });
 
   it("carries an existing photo through a full edit submission", async () => {
@@ -52,6 +52,32 @@ describe("ContactForm", () => {
     await waitFor(() => expect(action).toHaveBeenCalled());
 
     expect(action.mock.calls[0][1].get("photo")).toBe(PHOTO);
+    expect(JSON.parse(String(action.mock.calls[0][1].get("addresses")))).toHaveLength(1);
+  });
+
+  it("adds and submits multiple typed addresses", async () => {
+    const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
+      async () => ({ status: "idle" }),
+    );
+    renderForm(action);
+
+    await userEvent.click(screen.getByRole("button", { name: "Add address" }));
+    await userEvent.selectOptions(screen.getByLabelText(/address 1 type/i), "Home");
+    await userEvent.type(screen.getByLabelText("Street address"), "12 Home Lane");
+    await userEvent.click(screen.getByRole("button", { name: "Add address" }));
+    await userEvent.selectOptions(screen.getByLabelText(/address 2 type/i), "Work");
+    await userEvent.type(screen.getAllByLabelText("City")[1], "San Francisco");
+
+    await userEvent.type(screen.getByLabelText(/first name/i), "Grace");
+    await userEvent.type(screen.getByLabelText(/last name/i), "Hopper");
+    await userEvent.type(screen.getByLabelText(/^email/i), "grace@example.com");
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    expect(JSON.parse(String(action.mock.calls[0][1].get("addresses")))).toEqual([
+      expect.objectContaining({ type: "Home", street_address: "12 Home Lane" }),
+      expect.objectContaining({ type: "Work", city: "San Francisco" }),
+    ]);
   });
 
   it("uploads a photo and includes its data URL", async () => {

@@ -1,16 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { Fragment, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Field from "@/components/ui/Field";
 import Button, { buttonClasses } from "@/components/ui/Button";
 import PhotoUpload from "./PhotoUpload";
+import AddressEditor from "./AddressEditor";
 import { CONTACT_FIELD_GROUPS } from "@/lib/contacts/schema";
 import {
   EMPTY_FORM_STATE,
   type Contact,
+  type AddressFormValue,
   type ContactTextField,
   type FormState,
 } from "@/lib/contacts/types";
@@ -64,6 +66,17 @@ export default function ContactForm({
     last_name: state.values?.last_name ?? contact?.last_name ?? "Contact",
     email: state.values?.email ?? contact?.email ?? "new-contact",
   };
+  const initialAddresses: AddressFormValue[] =
+    state.values && "addresses" in state.values
+      ? (state.values.addresses ?? [])
+      : (contact?.addresses.map((address) => ({
+          type: address.type,
+          street_address: address.street_address ?? "",
+          city: address.city ?? "",
+          state: address.state ?? "",
+          postal_code: address.postal_code ?? "",
+          country: address.country ?? "",
+        })) ?? []);
 
   return (
     <form action={formAction} noValidate className="space-y-8">
@@ -100,29 +113,39 @@ export default function ContactForm({
       </fieldset>
 
       {CONTACT_FIELD_GROUPS.map((group) => (
-        <fieldset key={group.title} className="space-y-4">
-          <legend className="sr-only">{group.title}</legend>
+        <Fragment key={group.title}>
+          <fieldset className="space-y-4">
+            <legend className="sr-only">{group.title}</legend>
 
-          <div className="border-b border-hairline pb-2">
-            <h2 className="font-display text-sm font-semibold text-foreground">
-              {group.title}
-            </h2>
-            <p className="text-[13px] text-muted-foreground">
-              {group.description}
-            </p>
-          </div>
+            <div className="border-b border-hairline pb-2">
+              <h2 className="font-display text-sm font-semibold text-foreground">
+                {group.title}
+              </h2>
+              <p className="text-[13px] text-muted-foreground">
+                {group.description}
+              </p>
+            </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {group.fields.map((field) => (
-              <Field
-                key={field.name}
-                field={field}
-                defaultValue={valueFor(field.name)}
-                error={state.fieldErrors?.[field.name]}
-              />
-            ))}
-          </div>
-        </fieldset>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {group.fields.map((field) => (
+                <Field
+                  key={field.name}
+                  field={field}
+                  defaultValue={valueFor(field.name)}
+                  error={state.fieldErrors?.[field.name]}
+                />
+              ))}
+            </div>
+          </fieldset>
+
+          {group.title === "Work" ? (
+            <AddressEditor
+              initialAddresses={initialAddresses}
+              error={state.fieldErrors?.addresses}
+              errorToken={state}
+            />
+          ) : null}
+        </Fragment>
       ))}
 
       <div className="flex items-center gap-2 border-t border-hairline pt-4">
