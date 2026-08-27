@@ -7,6 +7,7 @@ import ContactsTable from "@/components/contacts/ContactsTable";
 import ContactsToolbar from "@/components/contacts/ContactsToolbar";
 import EmptyState from "@/components/contacts/EmptyState";
 import Pagination from "@/components/contacts/Pagination";
+import SuperheroMode from "@/components/contacts/SuperheroMode";
 import { buttonClasses } from "@/components/ui/Button";
 import { ApiUnreachableError, apiBaseUrl } from "@/lib/apiClient";
 import { getHealth, listContacts } from "@/lib/contacts/api";
@@ -16,7 +17,7 @@ import {
   toApiParams,
   type RawSearchParams,
 } from "@/lib/contacts/query";
-import type { ContactPage } from "@/lib/contacts/types";
+import type { ContactPage, HeroContact } from "@/lib/contacts/types";
 
 export const metadata: Metadata = {
   title: "Contacts",
@@ -38,6 +39,17 @@ export default async function ContactsPage({
 
   const result: ContactPage | null = outcome instanceof Error ? null : outcome;
   const error: Error | null = outcome instanceof Error ? outcome : null;
+  const heroes: HeroContact[] =
+    result?.items.map(
+      ({ id, first_name, last_name, full_name, email, photo }) => ({
+        id,
+        first_name,
+        last_name,
+        full_name,
+        email,
+        photo,
+      }),
+    ) ?? [];
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
@@ -56,10 +68,13 @@ export default async function ContactsPage({
           </p>
         </div>
 
-        <Link href="/contacts/new" className={buttonClasses("primary")}>
-          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          New contact
-        </Link>
+        <div className="flex items-center gap-2">
+          <SuperheroMode contacts={heroes} />
+          <Link href="/contacts/new" className={buttonClasses("primary")}>
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            New contact
+          </Link>
+        </div>
       </header>
 
       {error ? (
