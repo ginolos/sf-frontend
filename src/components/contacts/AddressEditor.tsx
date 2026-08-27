@@ -97,15 +97,21 @@ export default function AddressEditor({
         <div className="space-y-3">
           {addresses.map((address, index) => {
             const prefix = `address-${address.key}`;
+            const headingId = `${prefix}-heading`;
+            const autoCompleteSection = `section-${address.key}`;
             return (
-              <div key={address.key} className="rounded-lg border border-border bg-secondary/20 p-4">
+              <fieldset
+                key={address.key}
+                aria-labelledby={headingId}
+                className="rounded-lg border border-border bg-secondary/20 p-4"
+              >
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <MapPin className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div>
-                      <p className="text-sm font-medium text-foreground">
+                      <p id={headingId} className="text-sm font-medium text-foreground">
                         Address {index + 1}
                       </p>
                       <label htmlFor={`${prefix}-type`} className="sr-only">
@@ -172,14 +178,14 @@ export default function AddressEditor({
                         value={address[field]}
                         maxLength={field === "street_address" ? 300 : field === "postal_code" ? 20 : 120}
                         placeholder={placeholder}
-                        autoComplete={autoComplete}
+                        autoComplete={`${autoCompleteSection} ${autoComplete}`}
                         onChange={(event) => changeAddress(address.key, field, event.target.value)}
                         className={CONTROL}
                       />
                     </div>
                   ))}
                 </div>
-              </div>
+              </fieldset>
             );
           })}
         </div>
