@@ -55,7 +55,8 @@ the app or its end-to-end tests.
 
 The list response must include the contact records and the total count used for
 pagination. Contact email addresses must be unique; the frontend presents a
-conflict response as an inline email-field error.
+conflict response as an inline email-field error. Contact records may include a
+`photo` data URL; the create and replacement endpoints must return it unchanged.
 
 ## Development workflow
 
@@ -81,6 +82,10 @@ instead of starting its own development server.
   choose a unique address.
 - **Playwright cannot launch a browser** — rerun `npx playwright install` after
   installing dependencies or changing machines.
+- **Photo previews but disappears after save** — the backend process is using an
+  older schema. Confirm `ContactRead` includes `photo` at
+  `http://127.0.0.1:8000/openapi.json`, then restart the backend before creating
+  demo records. Its default in-memory database is cleared by a restart.
 
 ## What you should see
 
@@ -105,8 +110,9 @@ The landing route (`/` redirects here). What to check, top to bottom:
   selector. Both write to the URL, so the state survives a reload and is
   shareable.
 - **Table** — sortable `Name` and `Email` headers (the arrow shows the active
-  column and direction), an initials avatar per row, `Job title at Company` as
-  the subtitle, and per-row pencil (edit) and trash (delete) actions.
+  column and direction), a circular photo or initials fallback per row,
+  `Job title at Company` as the subtitle, and per-row pencil (edit) and trash
+  (delete) actions.
 - **Footer row** — `Showing 1–3 of 3` with Previous/Next, both disabled on a
   single page.
 - **Version stamp** — `web v0.1.0 (build 2 · 8ce2dc0)` at the bottom of every
@@ -123,7 +129,8 @@ just means an empty database, not a broken app.
 Click a row to get here. It confirms the detail read path works end to end:
 
 - **`< All contacts`** back link to the list.
-- **Header** — avatar, name, and `Job title at Company`, with **Edit**
+- **Header** — circular photo (or initials fallback), name, and
+  `Job title at Company`, with **Edit**
   (`/contacts/[id]/edit`) and a destructive **Delete** that asks before it acts.
 - **Field table** — email and phone rendered as `mailto:` / `tel:` links, then
   company, job title, address, and notes. Empty optional fields show `—` rather
@@ -198,6 +205,9 @@ e2e/                      Playwright specs (run against the real API)
   `src/lib/contacts/schema.ts` drives both the rendered fields and the Zod rules,
   which mirror the API's own limits. Submitting is a real form `action`, so it
   works before hydration; `useActionState` surfaces what comes back.
+- **Photos** — the picker validates JPEG, PNG, WebP, and GIF files up to 2 MB,
+  then stores the data URL in a hidden form field. Edit forms carry the current
+  photo through their full `PUT`; replacing or removing it is explicit.
 - **Styling** — Tailwind against semantic CSS variables (`bg-background`,
   `text-muted-foreground`, `border-hairline`, …) defined in `src/app/globals.css`.
   Dark is the default; light lives under `[data-theme="light"]`. Add colours as

@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { ContactInput } from "./types";
+import type {
+  ContactFormValues,
+  ContactInput,
+  ContactTextField,
+} from "./types";
 
 /**
  * Client/server-shared validation for the contact form.
@@ -41,6 +45,20 @@ export const contactInputSchema = z.object({
   phone: optionalText(40, "Phone"),
   company: optionalText(200, "Company"),
   job_title: optionalText(200, "Job title"),
+  photo: z
+    .union([
+      z.literal(""),
+      z
+        .string()
+        .max(2_800_000, "Photo must be 2 MB or smaller")
+        .regex(
+          /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/,
+          "Choose a JPEG, PNG, WebP, or GIF image",
+        ),
+    ])
+    .transform((value) => value || null)
+    .nullable()
+    .default(null),
   address: optionalText(300, "Address"),
   city: optionalText(120, "City"),
   state: optionalText(120, "State"),
@@ -53,8 +71,6 @@ export const contactInputSchema = z.object({
     .nullable()
     .default(null),
 }) satisfies z.ZodType<ContactInput, unknown>;
-
-export type ContactFormValues = z.input<typeof contactInputSchema>;
 
 /** Collapse a ZodError into one message per field, keyed by input name. */
 export function zodFieldErrors(
@@ -75,7 +91,7 @@ export function zodFieldErrors(
 /* ------------------------------------------------------------------ */
 
 export interface ContactFieldSpec {
-  name: keyof ContactInput;
+  name: ContactTextField;
   label: string;
   type?: "text" | "email" | "tel" | "textarea";
   required?: boolean;
@@ -215,13 +231,14 @@ export const CONTACT_FIELDS: ContactFieldSpec[] = CONTACT_FIELD_GROUPS.flatMap(
 );
 
 /** Pull the contact fields out of a submitted form, as raw strings. */
-export function formDataToValues(
-  formData: FormData,
-): Record<keyof ContactInput, string> {
-  return Object.fromEntries(
+export function formDataToValues(formData: FormData): ContactFormValues {
+  const textValues = Object.fromEntries(
     CONTACT_FIELDS.map((field) => [
       field.name,
       String(formData.get(field.name) ?? ""),
     ]),
-  ) as Record<keyof ContactInput, string>;
+  ) as Record<ContactTextField, string>;
+
+  const photo = String(formData.get("photo") ?? "") || null;
+  return { ...textValues, photo };
 }
