@@ -19,6 +19,50 @@ The backend must be running (default `http://127.0.0.1:8000`). If it is not, the
 list page says so rather than blowing up, and the header badge shows
 `api unreachable`.
 
+## Configuration
+
+Copy `.env.local.example` to `.env.local`; `.env.local` is deliberately ignored
+by Git, so local API addresses and CI-specific values stay out of commits.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `API_BASE_URL` | `http://127.0.0.1:8000` | Contacts API URL used by server components and server actions. |
+| `API_TIMEOUT_MS` | `8000` | API request timeout in milliseconds. |
+| `NEXT_PUBLIC_API_BASE_URL` | unset | Optional browser-visible API URL for client-side requests. |
+| `E2E_BASE_URL` | `http://localhost:3000` | Existing frontend server for Playwright to use. |
+| `NEXT_PUBLIC_APP_VERSION` | package version | Optional version-stamp override for CI. |
+| `NEXT_PUBLIC_BUILD_NUMBER` | Git commit count | Optional build-number override for CI. |
+| `NEXT_PUBLIC_GIT_SHA` | Git SHA | Optional Git revision override for CI. |
+
+`API_BASE_URL` should be the default choice. Only set
+`NEXT_PUBLIC_API_BASE_URL` when a browser component must call the API directly;
+the value is embedded in the client bundle.
+
+## Development workflow
+
+Before opening a change for review, run the usual checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+For the browser suite, start the Contacts API first, then run `npm run test:e2e`.
+Set `E2E_BASE_URL` if you want Playwright to target an already-running frontend
+instead of starting its own development server.
+
+### Troubleshooting
+
+- **`api unreachable`** — confirm the API is running, then check
+  `API_BASE_URL` and whether the configured host is reachable from the Next.js
+  server process.
+- **`409` after saving a contact** — another record already uses that email;
+  choose a unique address.
+- **Playwright cannot launch a browser** — rerun `npx playwright install` after
+  installing dependencies or changing machines.
+
 ## What you should see
 
 Use these two screenshots as the smoke test. If `http://localhost:3000` looks
