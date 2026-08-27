@@ -1,11 +1,23 @@
 "use client";
 
-import { type CSSProperties, useEffect, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { Shield, Sparkles, X, Zap } from "lucide-react";
 import ContactAvatar from "./ContactAvatar";
 import Button from "@/components/ui/Button";
 import { avatarHue } from "@/lib/contacts/format";
-import type { Contact } from "@/lib/contacts/types";
+import type { HeroContact } from "@/lib/contacts/types";
+
+export const MAX_ACTIVE_HEROES = 12;
+const HERO_ROTATION_MS = 6_000;
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type HeroStyle = CSSProperties & {
   "--hero-hue": number;
@@ -16,7 +28,7 @@ type HeroStyle = CSSProperties & {
   "--hero-rest": string;
 };
 
-function heroStyle(contact: Contact, index: number): HeroStyle {
+function heroStyle(contact: HeroContact, index: number): HeroStyle {
   const hue = avatarHue(contact.email);
   return {
     "--hero-hue": hue,
@@ -28,7 +40,7 @@ function heroStyle(contact: Contact, index: number): HeroStyle {
   };
 }
 
-function ContactHero({ contact, index }: { contact: Contact; index: number }) {
+function ContactHero({ contact, index }: { contact: HeroContact; index: number }) {
   return (
     <div
       className={`hero-sprite ${index % 2 ? "hero-sprite-reverse" : ""}`}
@@ -61,23 +73,142 @@ function ContactHero({ contact, index }: { contact: Contact; index: number }) {
   );
 }
 
-export default function SuperheroMode({ contacts }: { contacts: Contact[] }) {
+export default function SuperheroMode({ contacts }: { contacts: HeroContact[] }) {
   const [active, setActive] = useState(false);
+  const [batchStart, setBatchStart] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const stopButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  const close = useCallback(() => setActive(false), []);
+
+  function open() {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    setBatchStart(0);
+    setActive(true);
+  }
+
+  const visibleHeroes = Array.from(
+    { length: Math.min(MAX_ACTIVE_HEROES, contacts.length) },
+    (_, index) => contacts[(batchStart + index) % contacts.length],
+  );
 
   useEffect(() => {
     if (!active) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setActive(false);
+    const background = Array.from(document.body.children)
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== dialog)
+      .map((element) => ({
+        element,
+        inert: element.inert,
+        ariaHidden: element.getAttribute("aria-hidden"),
+      }));
+    for (const { element } of background) {
+      element.inert = true;
+      element.setAttribute("aria-hidden", "true");
     }
-    window.addEventListener("keydown", onKeyDown);
+
+    stopButtonRef.current?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialog!.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      );
+      const first = focusable[0] ?? dialog!;
+      const last = focusable.at(-1) ?? dialog!;
+      const focused = document.activeElement;
+
+      if (event.shiftKey && (focused === first || !dialog!.contains(focused))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (focused === last || !dialog!.contains(focused))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function containFocus(event: FocusEvent) {
+      if (!dialog!.contains(event.target as Node)) stopButtonRef.current?.focus();
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", containFocus);
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("focusin", containFocus);
+      for (const { element, inert, ariaHidden } of background) {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+      }
+      previousFocusRef.current?.focus();
     };
-  }, [active]);
+  }, [active, close]);
+
+  useEffect(() => {
+    if (!active || contacts.length <= MAX_ACTIVE_HEROES) return;
+    const rotation = window.setInterval(
+      () => setBatchStart((start) => (start + MAX_ACTIVE_HEROES) % contacts.length),
+      HERO_ROTATION_MS,
+    );
+    return () => window.clearInterval(rotation);
+  }, [active, contacts.length]);
+
+  const dialog = active ? (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Contact superhero mode"
+      className="hero-universe"
+      tabIndex={-1}
+    >
+      <div className="hero-halftone" aria-hidden="true" />
+      <div className="hero-burst hero-burst-one" aria-hidden="true" />
+      <div className="hero-burst hero-burst-two" aria-hidden="true" />
+
+      <div className="hero-title" aria-live="polite">
+        <span>SF CONTACTS</span>
+        <strong>ASSEMBLE!</strong>
+      </div>
+
+      <button
+        ref={stopButtonRef}
+        type="button"
+        onClick={close}
+        className="hero-stop-button"
+        aria-label="Stop hero mode and return contacts to normal"
+      >
+        <X className="h-5 w-5" aria-hidden="true" />
+        Back to normal
+      </button>
+
+      <div className="hero-flight-deck">
+        {visibleHeroes.map((contact, index) => (
+          <ContactHero
+            key={contact.id}
+            contact={contact}
+            index={batchStart + index}
+          />
+        ))}
+      </div>
+
+      <p className="hero-hint">Press Esc or “Back to normal” to land the team</p>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -86,48 +217,14 @@ export default function SuperheroMode({ contacts }: { contacts: Contact[] }) {
         variant={active ? "primary" : "secondary"}
         disabled={!contacts.length}
         aria-pressed={active}
-        onClick={() => setActive((current) => !current)}
+        onClick={open}
         className="hero-launch-button relative overflow-hidden"
       >
         <Sparkles className="h-4 w-4" aria-hidden="true" />
         {active ? "Stop hero mode" : "Hero mode"}
       </Button>
 
-      {active ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Contact superhero mode"
-          className="hero-universe"
-        >
-          <div className="hero-halftone" aria-hidden="true" />
-          <div className="hero-burst hero-burst-one" aria-hidden="true" />
-          <div className="hero-burst hero-burst-two" aria-hidden="true" />
-
-          <div className="hero-title" aria-live="polite">
-            <span>SF CONTACTS</span>
-            <strong>ASSEMBLE!</strong>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setActive(false)}
-            className="hero-stop-button"
-            aria-label="Stop hero mode and return contacts to normal"
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-            Back to normal
-          </button>
-
-          <div className="hero-flight-deck">
-            {contacts.map((contact, index) => (
-              <ContactHero key={contact.id} contact={contact} index={index} />
-            ))}
-          </div>
-
-          <p className="hero-hint">Press Esc or “Back to normal” to land the team</p>
-        </div>
-      ) : null}
+      {dialog ? createPortal(dialog, document.body) : null}
     </>
   );
 }

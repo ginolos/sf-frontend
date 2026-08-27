@@ -240,7 +240,6 @@
     transform: translateX(-25vw) scale(var(--hero-size));
     animation: hero-flight var(--hero-duration) linear var(--hero-delay) infinite;
     filter: drop-shadow(0 12px 10px rgb(0 0 0 / 0.45));
-    will-change: transform;
   }
 
   .hero-sprite-reverse {

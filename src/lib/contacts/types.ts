@@ -45,6 +45,12 @@ export interface Contact {
   full_name: string;
 }
 
+/** Minimal contact projection safe to pass into the client-only hero experience. */
+export type HeroContact = Pick<
+  Contact,
+  "id" | "first_name" | "last_name" | "full_name" | "email" | "photo"
+>;
+
 /** Every editable field, i.e. `ContactCreate` / `ContactReplace`. */
 export type ContactInput = Omit<
   Contact,
