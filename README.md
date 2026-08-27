@@ -38,6 +38,25 @@ by Git, so local API addresses and CI-specific values stay out of commits.
 `NEXT_PUBLIC_API_BASE_URL` when a browser component must call the API directly;
 the value is embedded in the client bundle.
 
+## API prerequisites
+
+This frontend expects a Contacts API compatible with the endpoints below. The
+API is not bundled with this repository, so start it separately before using
+the app or its end-to-end tests.
+
+| Endpoint | Used for |
+| --- | --- |
+| `GET /health` | The status badge and database label in the app header. |
+| `GET /api/v1/contacts` | Filtered, sorted, paginated contact list. |
+| `POST /api/v1/contacts` | Creating a contact. |
+| `GET /api/v1/contacts/{id}` | Contact detail page. |
+| `PUT /api/v1/contacts/{id}` | Editing a contact. |
+| `DELETE /api/v1/contacts/{id}` | Deleting a contact. |
+
+The list response must include the contact records and the total count used for
+pagination. Contact email addresses must be unique; the frontend presents a
+conflict response as an inline email-field error.
+
 ## Development workflow
 
 Before opening a change for review, run the usual checks:
