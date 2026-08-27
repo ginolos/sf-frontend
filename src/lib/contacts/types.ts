@@ -4,6 +4,31 @@
  */
 
 /** `ContactRead` — a stored contact, as returned by every contact endpoint. */
+export const ADDRESS_TYPES = ["Home", "Work", "Other"] as const;
+export type AddressType = (typeof ADDRESS_TYPES)[number];
+
+export interface AddressInput {
+  type: AddressType;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
+}
+
+export interface Address extends AddressInput {
+  id: number;
+}
+
+export interface AddressFormValue {
+  type: AddressType;
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+}
+
 export interface Contact {
   id: number;
   first_name: string;
@@ -13,11 +38,7 @@ export interface Contact {
   company: string | null;
   job_title: string | null;
   photo: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  postal_code: string | null;
-  country: string | null;
+  addresses: Address[];
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -27,14 +48,15 @@ export interface Contact {
 /** Every editable field, i.e. `ContactCreate` / `ContactReplace`. */
 export type ContactInput = Omit<
   Contact,
-  "id" | "created_at" | "updated_at" | "full_name"
->;
+  "id" | "created_at" | "updated_at" | "full_name" | "addresses"
+> & { addresses: AddressInput[] };
 
-export type ContactTextField = Exclude<keyof ContactInput, "photo">;
+export type ContactTextField = Exclude<keyof ContactInput, "photo" | "addresses">;
 
 /** Raw values echoed back to the form after an unsuccessful server action. */
 export type ContactFormValues = Record<ContactTextField, string> & {
   photo: string | null;
+  addresses: AddressFormValue[];
 };
 
 /** `ContactPage` — one page of contacts plus the totals needed to paginate. */

@@ -5,7 +5,7 @@ import {
   zodFieldErrors,
 } from "@/lib/contacts/schema";
 
-function values(overrides: Record<string, string> = {}) {
+function values(overrides: Record<string, unknown> = {}) {
   return {
     first_name: "Ada",
     last_name: "Lovelace",
@@ -14,11 +14,7 @@ function values(overrides: Record<string, string> = {}) {
     company: "",
     job_title: "",
     photo: "",
-    address: "",
-    city: "",
-    state: "",
-    postal_code: "",
-    country: "",
+    addresses: [],
     notes: "",
     ...overrides,
   };
@@ -77,13 +73,45 @@ describe("contactInputSchema", () => {
 
   it("enforces the API's length limits", () => {
     const result = contactInputSchema.safeParse(
-      values({ first_name: "a".repeat(101), postal_code: "9".repeat(21) }),
+      values({
+        first_name: "a".repeat(101),
+        addresses: [
+          {
+            type: "Home",
+            street_address: "1 Main St",
+            city: "",
+            state: "",
+            postal_code: "9".repeat(21),
+            country: "",
+          },
+        ],
+      }),
     );
 
     expect(zodFieldErrors(result.error!)).toEqual({
       first_name: "First name must be 100 characters or fewer",
-      postal_code: "Postal code must be 20 characters or fewer",
+      addresses: "Postal code must be 20 characters or fewer",
     });
+  });
+
+  it("requires each typed address to contain a location", () => {
+    const result = contactInputSchema.safeParse(
+      values({
+        addresses: [
+          {
+            type: "Other",
+            street_address: "",
+            city: "",
+            state: "",
+            postal_code: "",
+            country: "",
+          },
+        ],
+      }),
+    );
+    expect(zodFieldErrors(result.error!).addresses).toBe(
+      "Enter at least one location field",
+    );
   });
 });
 
@@ -99,8 +127,29 @@ describe("formDataToValues", () => {
     expect(extracted.first_name).toBe("Grace");
     expect(extracted.last_name).toBe("");
     expect(extracted.photo).toBeNull();
+    expect(extracted.addresses).toEqual([]);
     expect(Object.keys(extracted).sort()).toEqual(
-      [...CONTACT_FIELDS.map((field) => field.name), "photo"].sort(),
+      [...CONTACT_FIELDS.map((field) => field.name), "photo", "addresses"].sort(),
     );
+  });
+
+  it("deserializes the complete address collection", () => {
+    const formData = new FormData();
+    formData.set(
+      "addresses",
+      JSON.stringify([
+        {
+          type: "Work",
+          street_address: "1 Market St",
+          city: "San Francisco",
+          state: "CA",
+          postal_code: "94105",
+          country: "USA",
+        },
+      ]),
+    );
+
+    expect(formDataToValues(formData).addresses).toHaveLength(1);
+    expect(formDataToValues(formData).addresses[0].type).toBe("Work");
   });
 });

@@ -132,7 +132,8 @@ export function toFieldErrors(
 
   const fieldErrors: Partial<Record<keyof ContactInput, string>> = {};
   for (const issue of detail) {
-    const field = issue.loc?.[issue.loc.length - 1];
+    const bodyIndex = issue.loc?.indexOf("body") ?? -1;
+    const field = bodyIndex >= 0 ? issue.loc[bodyIndex + 1] : issue.loc?.[0];
     if (typeof field === "string" && field !== "body") {
       fieldErrors[field as keyof ContactInput] ??= issue.msg;
     }

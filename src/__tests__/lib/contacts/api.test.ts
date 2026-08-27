@@ -25,11 +25,7 @@ const INPUT: ContactInput = {
   company: null,
   job_title: null,
   photo: null,
-  address: null,
-  city: null,
-  state: null,
-  postal_code: null,
-  country: null,
+  addresses: [],
   notes: null,
 };
 
@@ -152,6 +148,10 @@ describe("error translation", () => {
         detail: [
           { loc: ["body", "email"], msg: "value is not a valid email address" },
           { loc: ["body", "first_name"], msg: "String should have at least 1 character" },
+          {
+            loc: ["body", "addresses", 0, "postal_code"],
+            msg: "String should have at most 20 characters",
+          },
         ],
       }),
     );
@@ -159,6 +159,7 @@ describe("error translation", () => {
     expect(toFieldErrors(error)).toEqual({
       email: "value is not a valid email address",
       first_name: "String should have at least 1 character",
+      addresses: "String should have at most 20 characters",
     });
   });
 
