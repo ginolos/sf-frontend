@@ -95,6 +95,7 @@ export default function ContactForm({
           initialPhoto={initialPhoto}
           contact={avatarContact}
           serverError={state.fieldErrors?.photo}
+          serverErrorToken={state}
         />
       </fieldset>
 

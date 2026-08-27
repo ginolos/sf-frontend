@@ -57,6 +57,24 @@ describe("contactInputSchema", () => {
     expect(zodFieldErrors(result.error!).email).toBe("Enter a valid email address");
   });
 
+  it("rejects arbitrary bytes with an allowed image label", () => {
+    const result = contactInputSchema.safeParse(
+      values({ photo: "data:image/png;base64,aGVsbG8=" }),
+    );
+    expect(zodFieldErrors(result.error!).photo).toBe(
+      "Photo content does not match its declared image type",
+    );
+  });
+
+  it("rejects image bytes that do not match the declared type", () => {
+    const result = contactInputSchema.safeParse(
+      values({ photo: "data:image/png;base64,/9j/2Q==" }),
+    );
+    expect(zodFieldErrors(result.error!).photo).toBe(
+      "Photo content does not match its declared image type",
+    );
+  });
+
   it("enforces the API's length limits", () => {
     const result = contactInputSchema.safeParse(
       values({ first_name: "a".repeat(101), postal_code: "9".repeat(21) }),

@@ -4,6 +4,7 @@ import { type ChangeEvent, type DragEvent, useRef, useState } from "react";
 import { Camera, Trash2, Upload } from "lucide-react";
 import ContactAvatar from "./ContactAvatar";
 import Button from "@/components/ui/Button";
+import { photoDataUrlSchema } from "@/lib/contacts/schema";
 
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -16,19 +17,29 @@ interface PhotoUploadProps {
     email: string;
   };
   serverError?: string;
+  serverErrorToken: object;
 }
 
 export default function PhotoUpload({
   initialPhoto,
   contact,
   serverError,
+  serverErrorToken,
 }: PhotoUploadProps) {
   const [photo, setPhoto] = useState(initialPhoto);
   const [error, setError] = useState<string>();
   const [dragging, setDragging] = useState(false);
+  const [dismissedServerErrorFor, setDismissedServerErrorFor] =
+    useState<object | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const readerRef = useRef<FileReader | null>(null);
+  const readVersionRef = useRef(0);
 
   function readPhoto(file?: File) {
+    readerRef.current?.abort();
+    readerRef.current = null;
+    const readVersion = ++readVersionRef.current;
+
     if (!file) return;
     if (!ACCEPTED_TYPES.includes(file.type)) {
       setError("Choose a JPEG, PNG, WebP, or GIF image.");
@@ -40,13 +51,29 @@ export default function PhotoUpload({
     }
 
     const reader = new FileReader();
+    readerRef.current = reader;
     reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setPhoto(reader.result);
-        setError(undefined);
+      if (readVersion !== readVersionRef.current || typeof reader.result !== "string") {
+        return;
+      }
+
+      const parsed = photoDataUrlSchema.safeParse(reader.result);
+      if (!parsed.success || !parsed.data) {
+        setError(parsed.error?.issues[0]?.message ?? "That file is not a valid image.");
+        return;
+      }
+
+      setPhoto(parsed.data);
+      setError(undefined);
+      setDismissedServerErrorFor(serverErrorToken);
+      readerRef.current = null;
+    };
+    reader.onerror = () => {
+      if (readVersion === readVersionRef.current) {
+        setError("That photo could not be read. Try another file.");
+        readerRef.current = null;
       }
     };
-    reader.onerror = () => setError("That photo could not be read. Try another file.");
     reader.readAsDataURL(file);
   }
 
@@ -61,7 +88,8 @@ export default function PhotoUpload({
     readPhoto(event.dataTransfer.files?.[0]);
   }
 
-  const message = error ?? serverError;
+  const message =
+    error ?? (dismissedServerErrorFor === serverErrorToken ? undefined : serverError);
   const previewContact = { ...contact, photo };
 
   return (
@@ -119,8 +147,12 @@ export default function PhotoUpload({
             variant="ghost"
             aria-label="Remove profile photo"
             onClick={() => {
+              readVersionRef.current += 1;
+              readerRef.current?.abort();
+              readerRef.current = null;
               setPhoto(null);
               setError(undefined);
+              setDismissedServerErrorFor(serverErrorToken);
             }}
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
