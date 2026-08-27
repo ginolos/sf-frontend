@@ -6,11 +6,12 @@ import Link from "next/link";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Field from "@/components/ui/Field";
 import Button, { buttonClasses } from "@/components/ui/Button";
+import PhotoUpload from "./PhotoUpload";
 import { CONTACT_FIELD_GROUPS } from "@/lib/contacts/schema";
 import {
   EMPTY_FORM_STATE,
   type Contact,
-  type ContactInput,
+  type ContactTextField,
   type FormState,
 } from "@/lib/contacts/types";
 
@@ -50,9 +51,19 @@ export default function ContactForm({
 }) {
   const [state, formAction] = useActionState(action, EMPTY_FORM_STATE);
 
-  function valueFor(name: keyof ContactInput): string {
+  function valueFor(name: ContactTextField): string {
     return state.values?.[name] ?? contact?.[name] ?? "";
   }
+
+  const initialPhoto =
+    state.values && "photo" in state.values
+      ? (state.values.photo ?? null)
+      : (contact?.photo ?? null);
+  const avatarContact = {
+    first_name: state.values?.first_name ?? contact?.first_name ?? "New",
+    last_name: state.values?.last_name ?? contact?.last_name ?? "Contact",
+    email: state.values?.email ?? contact?.email ?? "new-contact",
+  };
 
   return (
     <form action={formAction} noValidate className="space-y-8">
@@ -69,6 +80,24 @@ export default function ContactForm({
           <span>{state.message}</span>
         </div>
       ) : null}
+
+      <fieldset className="space-y-4">
+        <legend className="sr-only">Profile photo</legend>
+        <div className="border-b border-hairline pb-2">
+          <h2 className="font-display text-sm font-semibold text-foreground">
+            Profile photo
+          </h2>
+          <p className="text-[13px] text-muted-foreground">
+            Optional. Contacts without a photo use their initials.
+          </p>
+        </div>
+        <PhotoUpload
+          initialPhoto={initialPhoto}
+          contact={avatarContact}
+          serverError={state.fieldErrors?.photo}
+          serverErrorToken={state}
+        />
+      </fieldset>
 
       {CONTACT_FIELD_GROUPS.map((group) => (
         <fieldset key={group.title} className="space-y-4">

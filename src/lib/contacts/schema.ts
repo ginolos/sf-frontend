@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { ContactInput } from "./types";
+import type {
+  ContactFormValues,
+  ContactInput,
+  ContactTextField,
+} from "./types";
 
 /**
  * Client/server-shared validation for the contact form.
@@ -28,6 +32,80 @@ function requiredText(max: number, label: string) {
     .max(max, `${label} must be ${max} characters or fewer`);
 }
 
+const PHOTO_DATA_URL =
+  /^data:image\/(jpeg|png|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$/;
+
+function decodeBase64(value: string): Uint8Array | null {
+  try {
+    const decoded = globalThis.atob(value);
+    return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
+function matchesImageSignature(mediaType: string, bytes: Uint8Array): boolean {
+  const startsWith = (...signature: number[]) =>
+    signature.every((byte, index) => bytes[index] === byte);
+
+  if (mediaType === "png") {
+    return startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+  }
+  if (mediaType === "jpeg") {
+    return (
+      startsWith(0xff, 0xd8, 0xff) &&
+      bytes.at(-2) === 0xff &&
+      bytes.at(-1) === 0xd9
+    );
+  }
+  if (mediaType === "webp") {
+    return (
+      bytes.length >= 12 &&
+      startsWith(0x52, 0x49, 0x46, 0x46) &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    );
+  }
+  if (mediaType === "gif") {
+    return (
+      startsWith(0x47, 0x49, 0x46, 0x38, 0x37, 0x61) ||
+      startsWith(0x47, 0x49, 0x46, 0x38, 0x39, 0x61)
+    );
+  }
+  return false;
+}
+
+export const photoDataUrlSchema = z
+  .union([z.literal(""), z.string().max(2_800_000, "Photo must be 2 MB or smaller")])
+  .superRefine((value, context) => {
+    if (!value) return;
+    const match = PHOTO_DATA_URL.exec(value);
+    if (!match) {
+      context.addIssue({
+        code: "custom",
+        message: "Choose a JPEG, PNG, WebP, or GIF image",
+      });
+      return;
+    }
+
+    const bytes = decodeBase64(match[2]);
+    if (!bytes) {
+      context.addIssue({ code: "custom", message: "Photo contains invalid base64 data" });
+    } else if (bytes.length > 2 * 1024 * 1024) {
+      context.addIssue({ code: "custom", message: "Photo must be 2 MB or smaller" });
+    } else if (!matchesImageSignature(match[1], bytes)) {
+      context.addIssue({
+        code: "custom",
+        message: "Photo content does not match its declared image type",
+      });
+    }
+  })
+  .transform((value) => value || null)
+  .nullable()
+  .default(null);
+
 export const contactInputSchema = z.object({
   first_name: requiredText(100, "First name"),
   last_name: requiredText(100, "Last name"),
@@ -41,6 +119,7 @@ export const contactInputSchema = z.object({
   phone: optionalText(40, "Phone"),
   company: optionalText(200, "Company"),
   job_title: optionalText(200, "Job title"),
+  photo: photoDataUrlSchema,
   address: optionalText(300, "Address"),
   city: optionalText(120, "City"),
   state: optionalText(120, "State"),
@@ -53,8 +132,6 @@ export const contactInputSchema = z.object({
     .nullable()
     .default(null),
 }) satisfies z.ZodType<ContactInput, unknown>;
-
-export type ContactFormValues = z.input<typeof contactInputSchema>;
 
 /** Collapse a ZodError into one message per field, keyed by input name. */
 export function zodFieldErrors(
@@ -75,7 +152,7 @@ export function zodFieldErrors(
 /* ------------------------------------------------------------------ */
 
 export interface ContactFieldSpec {
-  name: keyof ContactInput;
+  name: ContactTextField;
   label: string;
   type?: "text" | "email" | "tel" | "textarea";
   required?: boolean;
@@ -215,13 +292,14 @@ export const CONTACT_FIELDS: ContactFieldSpec[] = CONTACT_FIELD_GROUPS.flatMap(
 );
 
 /** Pull the contact fields out of a submitted form, as raw strings. */
-export function formDataToValues(
-  formData: FormData,
-): Record<keyof ContactInput, string> {
-  return Object.fromEntries(
+export function formDataToValues(formData: FormData): ContactFormValues {
+  const textValues = Object.fromEntries(
     CONTACT_FIELDS.map((field) => [
       field.name,
       String(formData.get(field.name) ?? ""),
     ]),
-  ) as Record<keyof ContactInput, string>;
+  ) as Record<ContactTextField, string>;
+
+  const photo = String(formData.get("photo") ?? "") || null;
+  return { ...textValues, photo };
 }

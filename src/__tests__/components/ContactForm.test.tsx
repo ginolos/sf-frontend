@@ -5,6 +5,11 @@ import ContactForm from "@/components/contacts/ContactForm";
 import { makeContact } from "../mocks/handlers";
 import type { FormState } from "@/lib/contacts/types";
 
+const PHOTO = "data:image/png;base64,iVBORw0KGgo=";
+const PNG_SIGNATURE = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+
 function renderForm(action: jest.Mock, contact?: ReturnType<typeof makeContact>) {
   return render(
     <ContactForm
@@ -34,6 +39,61 @@ describe("ContactForm", () => {
     expect(screen.getByLabelText(/^email/i)).toHaveValue("ada@example.com");
     // Nulls become empty inputs rather than the string "null".
     expect(screen.getByLabelText(/street address/i)).toHaveValue("");
+  });
+
+  it("carries an existing photo through a full edit submission", async () => {
+    const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
+      async () => ({ status: "idle" }),
+    );
+    renderForm(action, makeContact({ photo: PHOTO }));
+
+    expect(screen.getByText("Profile photo ready")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    expect(action.mock.calls[0][1].get("photo")).toBe(PHOTO);
+  });
+
+  it("uploads a photo and includes its data URL", async () => {
+    const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
+      async () => ({ status: "idle" }),
+    );
+    renderForm(action);
+
+    await userEvent.upload(
+      screen.getByLabelText("Choose profile photo"),
+      new File([PNG_SIGNATURE], "avatar.png", { type: "image/png" }),
+    );
+    await screen.findByText("Profile photo ready");
+
+    await userEvent.type(screen.getByLabelText(/first name/i), "Grace");
+    await userEvent.type(screen.getByLabelText(/last name/i), "Hopper");
+    await userEvent.type(screen.getByLabelText(/^email/i), "grace@example.com");
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    expect(action.mock.calls[0][1].get("photo")).toBe(PHOTO);
+  });
+
+  it("clears a server photo error after a valid replacement", async () => {
+    const action = jest.fn(
+      async (): Promise<FormState> => ({
+        status: "error",
+        message: "The API rejected these values.",
+        fieldErrors: { photo: "Photo content does not match its declared image type" },
+      }),
+    );
+    renderForm(action);
+
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+    expect(await screen.findByText(/photo content does not match/i)).toBeInTheDocument();
+
+    await userEvent.upload(
+      screen.getByLabelText("Choose profile photo"),
+      new File([PNG_SIGNATURE], "fixed.png", { type: "image/png" }),
+    );
+    await screen.findByText("Profile photo ready");
+    expect(screen.queryByText(/photo content does not match/i)).not.toBeInTheDocument();
   });
 
   it("submits the entered values to the action", async () => {
